@@ -2,131 +2,137 @@ import pygame
 import random
 import sys
 
-# ─── Great Place To Work Brand Colors (BrandBook 2.1) ───────────────────────
-BRAND_RED    = (255, 22,  40)   # #FF1628 — Hero color
-BRAND_BLACK  = (17,  19,  28)   # #11131C — Background
-WHITE        = (255, 255, 255)  # #FFFFFF — Text / UI
-GRAY_3       = (222, 229, 228)  # #DEE5E4 — Grid lines (subtle)
-GRAY_7       = (105, 115, 122)  # #69737A — Snake body accent
-GRAY_10      = (50,  56,  63)   # #32383F — Panel / HUD background
+# ─── Great Place To Work Brand Colors ────────────────────────────────────────
+BRAND_RED   = (255, 22,  40)
+BRAND_BLACK = (17,  19,  28)
+WHITE       = (255, 255, 255)
+GRAY_3      = (222, 229, 228)
+GRAY_7      = (105, 115, 122)
+GRAY_10     = (50,  56,  63)
 
 # ─── Game Config ─────────────────────────────────────────────────────────────
-CELL_SIZE    = 20
-COLS         = 30
-ROWS         = 25
-WIDTH        = COLS * CELL_SIZE          # 600
-HEIGHT       = ROWS * CELL_SIZE + 60     # 560 (game) + 60 (HUD)
-FPS          = 10
+CELL_SIZE = 20
+COLS      = 30
+ROWS      = 25
+WIDTH     = COLS * CELL_SIZE
+HEIGHT    = ROWS * CELL_SIZE + 60
+FPS       = 10
 
-# ─── Directions ──────────────────────────────────────────────────────────────
 UP    = (0, -1)
 DOWN  = (0,  1)
 LEFT  = (-1, 0)
 RIGHT = (1,  0)
 
+
 def draw_rounded_rect(surface, color, rect, radius=6):
     pygame.draw.rect(surface, color, rect, border_radius=radius)
+
+
+def spawn_food(snake):
+    while True:
+        pos = (random.randint(0, COLS - 1), random.randint(0, ROWS - 1))
+        if pos not in snake:
+            return pos
+
+
+def new_game():
+    snake     = [(COLS // 2, ROWS // 2)]
+    direction = RIGHT
+    food      = spawn_food(snake)
+    score     = 0
+    return snake, direction, food, score
+
+
+def draw_grid(screen):
+    for x in range(0, COLS * CELL_SIZE, CELL_SIZE):
+        pygame.draw.line(screen, GRAY_10, (x, 0), (x, ROWS * CELL_SIZE))
+    for y in range(0, ROWS * CELL_SIZE, CELL_SIZE):
+        pygame.draw.line(screen, GRAY_10, (0, y), (COLS * CELL_SIZE, y))
+
+
+def draw_snake(screen, snake):
+    for i, (x, y) in enumerate(snake):
+        rect  = pygame.Rect(x * CELL_SIZE + 1, y * CELL_SIZE + 1,
+                            CELL_SIZE - 2, CELL_SIZE - 2)
+        color = WHITE if i == 0 else GRAY_7
+        draw_rounded_rect(screen, color, rect, radius=5)
+        if i == 0:
+            inner = pygame.Rect(x * CELL_SIZE + 5, y * CELL_SIZE + 5,
+                                CELL_SIZE - 10, CELL_SIZE - 10)
+            draw_rounded_rect(screen, BRAND_RED, inner, radius=3)
+
+
+def draw_food(screen, food):
+    x, y = food
+    rect = pygame.Rect(x * CELL_SIZE + 2, y * CELL_SIZE + 2,
+                       CELL_SIZE - 4, CELL_SIZE - 4)
+    draw_rounded_rect(screen, BRAND_RED, rect, radius=CELL_SIZE // 2)
+    pygame.draw.circle(screen, WHITE,
+                       (x * CELL_SIZE + 6, y * CELL_SIZE + 6), 2)
+
+
+def draw_hud(screen, score, high_score, font_small):
+    hud_rect = pygame.Rect(0, ROWS * CELL_SIZE, WIDTH, 60)
+    pygame.draw.rect(screen, GRAY_10, hud_rect)
+    pygame.draw.line(screen, BRAND_RED,
+                     (0, ROWS * CELL_SIZE), (WIDTH, ROWS * CELL_SIZE), 2)
+
+    score_text = font_small.render(f"SCORE  {score}", True, WHITE)
+    best_text  = font_small.render(f"BEST  {high_score}", True, GRAY_3)
+    title_text = font_small.render("Great Place To Work®", True, BRAND_RED)
+
+    screen.blit(score_text, (16, ROWS * CELL_SIZE + 20))
+    screen.blit(best_text,  (160, ROWS * CELL_SIZE + 20))
+    screen.blit(title_text, (WIDTH - title_text.get_width() - 16,
+                              ROWS * CELL_SIZE + 20))
+
+
+def draw_overlay(screen, font_large, font_small, text_lines,
+                 sub="Press SPACE to play"):
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((17, 19, 28, 210))
+    screen.blit(overlay, (0, 0))
+
+    y_start = HEIGHT // 2 - len(text_lines) * 28
+    for i, line in enumerate(text_lines):
+        surf = font_large.render(line, True, WHITE)
+        screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2,
+                            y_start + i * 44))
+
+    sub_surf = font_small.render(sub, True, GRAY_3)
+    screen.blit(sub_surf, (WIDTH // 2 - sub_surf.get_width() // 2,
+                            y_start + len(text_lines) * 44 + 16))
+
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("🐍 Great Place To Work — Snake")
+    pygame.display.set_caption("Great Place To Work — Snake")
     clock = pygame.time.Clock()
 
     font_large = pygame.font.SysFont("Arial", 28, bold=True)
     font_small = pygame.font.SysFont("Arial", 18)
-    font_title = pygame.font.SysFont("Arial", 42, bold=True)
-
-    def new_game():
-        snake = [(COLS // 2, ROWS // 2)]
-        direction = RIGHT
-        food = spawn_food(snake)
-        score = 0
-        return snake, direction, food, score
-
-    def spawn_food(snake):
-        while True:
-            pos = (random.randint(0, COLS - 1), random.randint(0, ROWS - 1))
-            if pos not in snake:
-                return pos
-
-    def draw_grid():
-        for x in range(0, COLS * CELL_SIZE, CELL_SIZE):
-            pygame.draw.line(screen, GRAY_10, (x, 0), (x, ROWS * CELL_SIZE))
-        for y in range(0, ROWS * CELL_SIZE, CELL_SIZE):
-            pygame.draw.line(screen, GRAY_10, (0, y), (COLS * CELL_SIZE, y))
-
-    def draw_snake(snake):
-        for i, (x, y) in enumerate(snake):
-            rect = pygame.Rect(x * CELL_SIZE + 1, y * CELL_SIZE + 1,
-                               CELL_SIZE - 2, CELL_SIZE - 2)
-            color = WHITE if i == 0 else GRAY_7
-            draw_rounded_rect(screen, color, rect, radius=5)
-            # Red accent on head
-            if i == 0:
-                inner = pygame.Rect(x * CELL_SIZE + 5, y * CELL_SIZE + 5,
-                                    CELL_SIZE - 10, CELL_SIZE - 10)
-                draw_rounded_rect(screen, BRAND_RED, inner, radius=3)
-
-    def draw_food(food):
-        x, y = food
-        rect = pygame.Rect(x * CELL_SIZE + 2, y * CELL_SIZE + 2,
-                           CELL_SIZE - 4, CELL_SIZE - 4)
-        draw_rounded_rect(screen, BRAND_RED, rect, radius=CELL_SIZE // 2)
-        # Shine dot
-        pygame.draw.circle(screen, WHITE,
-                           (x * CELL_SIZE + 6, y * CELL_SIZE + 6), 2)
-
-    def draw_hud(score, high_score):
-        hud_rect = pygame.Rect(0, ROWS * CELL_SIZE, WIDTH, 60)
-        pygame.draw.rect(screen, GRAY_10, hud_rect)
-        pygame.draw.line(screen, BRAND_RED, (0, ROWS * CELL_SIZE),
-                         (WIDTH, ROWS * CELL_SIZE), 2)
-
-        score_text  = font_small.render(f"SCORE  {score}", True, WHITE)
-        best_text   = font_small.render(f"BEST  {high_score}", True, GRAY_3)
-        title_text  = font_small.render("Great Place To Work®", True, BRAND_RED)
-
-        screen.blit(score_text,  (16, ROWS * CELL_SIZE + 20))
-        screen.blit(best_text,   (160, ROWS * CELL_SIZE + 20))
-        screen.blit(title_text,  (WIDTH - title_text.get_width() - 16,
-                                  ROWS * CELL_SIZE + 20))
-
-    def draw_overlay(text_lines, sub="Press SPACE to play"):
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((17, 19, 28, 210))
-        screen.blit(overlay, (0, 0))
-        pygame.draw.rect(screen, BRAND_RED,
-                         (WIDTH // 2 - 4, HEIGHT // 4, 8, HEIGHT // 2), 0)
-
-        y_start = HEIGHT // 2 - len(text_lines) * 28
-        for i, line in enumerate(text_lines):
-            surf = font_large.render(line, True, WHITE)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2,
-                                y_start + i * 44))
-        sub_surf = font_small.render(sub, True, GRAY_3)
-        screen.blit(sub_surf, (WIDTH // 2 - sub_surf.get_width() // 2,
-                               y_start + len(text_lines) * 44 + 16))
 
     snake, direction, food, score = new_game()
     high_score  = 0
     pending_dir = direction
-    game_state  = "start"   # "start" | "playing" | "dead"
+    game_state  = "start"  # "start" | "playing" | "dead"
 
     while True:
         clock.tick(FPS)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                pygame.quit()
+                sys.exit()
 
             if event.type == pygame.KEYDOWN:
                 if game_state == "playing":
-                    if event.key == pygame.K_UP    and direction != DOWN:
+                    if event.key == pygame.K_UP and direction != DOWN:
                         pending_dir = UP
-                    elif event.key == pygame.K_DOWN  and direction != UP:
+                    elif event.key == pygame.K_DOWN and direction != UP:
                         pending_dir = DOWN
-                    elif event.key == pygame.K_LEFT  and direction != RIGHT:
+                    elif event.key == pygame.K_LEFT and direction != RIGHT:
                         pending_dir = LEFT
                     elif event.key == pygame.K_RIGHT and direction != LEFT:
                         pending_dir = RIGHT
@@ -141,39 +147,41 @@ def main():
 
         # ── Update ──────────────────────────────────────────────────────────
         if game_state == "playing":
-            direction = pending_dir
+            direction    = pending_dir
             head_x, head_y = snake[0]
-            new_head = (head_x + direction[0], head_y + direction[1])
+            new_head     = (head_x + direction[0], head_y + direction[1])
 
-            # Wall or self collision → game over
-            if (new_head in snake or
-                    not (0 <= new_head[0] < COLS) or
-                    not (0 <= new_head[1] < ROWS)):
+            if (new_head in snake
+                    or not (0 <= new_head[0] < COLS)
+                    or not (0 <= new_head[1] < ROWS)):
                 high_score = max(high_score, score)
                 game_state = "dead"
             else:
                 snake.insert(0, new_head)
                 if new_head == food:
                     score += 10
-                    food = spawn_food(snake)
+                    food   = spawn_food(snake)
                 else:
                     snake.pop()
 
         # ── Draw ────────────────────────────────────────────────────────────
         screen.fill(BRAND_BLACK)
-        draw_grid()
-        draw_snake(snake)
-        draw_food(food)
-        draw_hud(score, high_score)
+        draw_grid(screen)
+        draw_snake(screen, snake)
+        draw_food(screen, food)
+        draw_hud(screen, score, high_score, font_small)
 
         if game_state == "start":
-            draw_overlay(["Great Place To Work®", "🐍 Snake"],
+            draw_overlay(screen, font_large, font_small,
+                         ["Great Place To Work®", "Snake"],
                          sub="Arrow Keys to move  •  SPACE to start")
         elif game_state == "dead":
-            draw_overlay([f"Game Over!", f"Score: {score}"],
+            draw_overlay(screen, font_large, font_small,
+                         ["Game Over!", f"Score: {score}"],
                          sub="SPACE to restart  •  ESC for menu")
 
         pygame.display.flip()
+
 
 if __name__ == "__main__":
     main()
