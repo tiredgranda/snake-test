@@ -1,187 +1,363 @@
-import pygame
-import random
-import sys
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Great Place To Work — Snake</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-# ─── Great Place To Work Brand Colors ────────────────────────────────────────
-BRAND_RED   = (255, 22,  40)
-BRAND_BLACK = (17,  19,  28)
-WHITE       = (255, 255, 255)
-GRAY_3      = (222, 229, 228)
-GRAY_7      = (105, 115, 122)
-GRAY_10     = (50,  56,  63)
+    body {
+      background-color: #11131C;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
 
-# ─── Game Config ─────────────────────────────────────────────────────────────
-CELL_SIZE = 20
-COLS      = 30
-ROWS      = 25
-WIDTH     = COLS * CELL_SIZE
-HEIGHT    = ROWS * CELL_SIZE + 60
-FPS       = 10
+    #brand-header {
+      color: #FF1628;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
 
-UP    = (0, -1)
-DOWN  = (0,  1)
-LEFT  = (-1, 0)
-RIGHT = (1,  0)
+    #game-wrapper {
+      position: relative;
+      border: 2px solid #FF1628;
+      border-radius: 6px;
+      overflow: hidden;
+    }
 
+    canvas {
+      display: block;
+      background-color: #11131C;
+    }
 
-def draw_rounded_rect(surface, color, rect, radius=6):
-    pygame.draw.rect(surface, color, rect, border_radius=radius)
+    #hud {
+      background-color: #32383F;
+      border-top: 2px solid #FF1628;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      height: 48px;
+    }
 
+    .hud-item {
+      color: #DEE5E4;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
 
-def spawn_food(snake):
-    while True:
-        pos = (random.randint(0, COLS - 1), random.randint(0, ROWS - 1))
-        if pos not in snake:
-            return pos
+    .hud-item span {
+      color: #FFFFFF;
+    }
 
+    #hud-brand {
+      color: #FF1628;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+    }
 
-def new_game():
-    snake     = [(COLS // 2, ROWS // 2)]
-    direction = RIGHT
-    food      = spawn_food(snake)
-    score     = 0
-    return snake, direction, food, score
+    /* Overlay */
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(17, 19, 28, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      z-index: 10;
+    }
 
+    #overlay h1 {
+      color: #FFFFFF;
+      font-size: 28px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
 
-def draw_grid(screen):
-    for x in range(0, COLS * CELL_SIZE, CELL_SIZE):
-        pygame.draw.line(screen, GRAY_10, (x, 0), (x, ROWS * CELL_SIZE))
-    for y in range(0, ROWS * CELL_SIZE, CELL_SIZE):
-        pygame.draw.line(screen, GRAY_10, (0, y), (COLS * CELL_SIZE, y))
+    #overlay h2 {
+      color: #FF1628;
+      font-size: 22px;
+      font-weight: bold;
+    }
 
+    #overlay p {
+      color: #DEE5E4;
+      font-size: 14px;
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
 
-def draw_snake(screen, snake):
-    for i, (x, y) in enumerate(snake):
-        rect  = pygame.Rect(x * CELL_SIZE + 1, y * CELL_SIZE + 1,
-                            CELL_SIZE - 2, CELL_SIZE - 2)
-        color = WHITE if i == 0 else GRAY_7
-        draw_rounded_rect(screen, color, rect, radius=5)
-        if i == 0:
-            inner = pygame.Rect(x * CELL_SIZE + 5, y * CELL_SIZE + 5,
-                                CELL_SIZE - 10, CELL_SIZE - 10)
-            draw_rounded_rect(screen, BRAND_RED, inner, radius=3)
+    #overlay .divider {
+      width: 48px;
+      height: 4px;
+      background: #FF1628;
+      border-radius: 2px;
+      margin: 6px 0;
+    }
 
+    #overlay button {
+      margin-top: 16px;
+      padding: 12px 36px;
+      background-color: #FF1628;
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: bold;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: background 0.2s;
+    }
 
-def draw_food(screen, food):
-    x, y = food
-    rect = pygame.Rect(x * CELL_SIZE + 2, y * CELL_SIZE + 2,
-                       CELL_SIZE - 4, CELL_SIZE - 4)
-    draw_rounded_rect(screen, BRAND_RED, rect, radius=CELL_SIZE // 2)
-    pygame.draw.circle(screen, WHITE,
-                       (x * CELL_SIZE + 6, y * CELL_SIZE + 6), 2)
+    #overlay button:hover {
+      background-color: #cc0f1e;
+    }
+  </style>
+</head>
+<body>
 
+  <div id="brand-header">Great Place To Work®</div>
 
-def draw_hud(screen, score, high_score, font_small):
-    hud_rect = pygame.Rect(0, ROWS * CELL_SIZE, WIDTH, 60)
-    pygame.draw.rect(screen, GRAY_10, hud_rect)
-    pygame.draw.line(screen, BRAND_RED,
-                     (0, ROWS * CELL_SIZE), (WIDTH, ROWS * CELL_SIZE), 2)
+  <div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
 
-    score_text = font_small.render(f"SCORE  {score}", True, WHITE)
-    best_text  = font_small.render(f"BEST  {high_score}", True, GRAY_3)
-    title_text = font_small.render("Great Place To Work®", True, BRAND_RED)
+    <div id="hud">
+      <div class="hud-item">SCORE &nbsp;<span id="score-val">0</span></div>
+      <div id="hud-brand">Great Place To Work®</div>
+      <div class="hud-item">BEST &nbsp;<span id="best-val">0</span></div>
+    </div>
 
-    screen.blit(score_text, (16, ROWS * CELL_SIZE + 20))
-    screen.blit(best_text,  (160, ROWS * CELL_SIZE + 20))
-    screen.blit(title_text, (WIDTH - title_text.get_width() - 16,
-                              ROWS * CELL_SIZE + 20))
+    <!-- Overlay (start / game over) -->
+    <div id="overlay">
+      <h1>Great Place To Work®</h1>
+      <div class="divider"></div>
+      <h2>🐍 Snake</h2>
+      <p>Use Arrow Keys to move</p>
+      <button id="overlay-btn">PLAY</button>
+    </div>
+  </div>
 
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const CELL   = 20;
+    const COLS   = 30;
+    const ROWS   = 25;
+    const FPS    = 10;
 
-def draw_overlay(screen, font_large, font_small, text_lines,
-                 sub="Press SPACE to play"):
-    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    overlay.fill((17, 19, 28, 210))
-    screen.blit(overlay, (0, 0))
+    // ── Brand Colors ────────────────────────────────────────────────────────
+    const C = {
+      black  : "#11131C",
+      red    : "#FF1628",
+      white  : "#FFFFFF",
+      gray3  : "#DEE5E4",
+      gray7  : "#69737A",
+      gray10 : "#32383F",
+    };
 
-    y_start = HEIGHT // 2 - len(text_lines) * 28
-    for i, line in enumerate(text_lines):
-        surf = font_large.render(line, True, WHITE)
-        screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2,
-                            y_start + i * 44))
+    // ── Canvas Setup ────────────────────────────────────────────────────────
+    const canvas = document.getElementById("gameCanvas");
+    canvas.width  = COLS * CELL;
+    canvas.height = ROWS * CELL;
+    const ctx = canvas.getContext("2d");
 
-    sub_surf = font_small.render(sub, True, GRAY_3)
-    screen.blit(sub_surf, (WIDTH // 2 - sub_surf.get_width() // 2,
-                            y_start + len(text_lines) * 44 + 16))
+    // ── State ───────────────────────────────────────────────────────────────
+    let snake, dir, nextDir, food, score, highScore = 0, loop;
 
+    const DIR = {
+      UP    : { x:  0, y: -1 },
+      DOWN  : { x:  0, y:  1 },
+      LEFT  : { x: -1, y:  0 },
+      RIGHT : { x:  1, y:  0 },
+    };
 
-def main():
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Great Place To Work — Snake")
-    clock = pygame.time.Clock()
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function spawnFood() {
+      let pos;
+      do {
+        pos = {
+          x: Math.floor(Math.random() * COLS),
+          y: Math.floor(Math.random() * ROWS),
+        };
+      } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+      return pos;
+    }
 
-    font_large = pygame.font.SysFont("Arial", 28, bold=True)
-    font_small = pygame.font.SysFont("Arial", 18)
+    function newGame() {
+      snake   = [{ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) }];
+      dir     = DIR.RIGHT;
+      nextDir = DIR.RIGHT;
+      score   = 0;
+      food    = spawnFood();
+      updateHUD();
+    }
 
-    snake, direction, food, score = new_game()
-    high_score  = 0
-    pending_dir = direction
-    game_state  = "start"  # "start" | "playing" | "dead"
+    function updateHUD() {
+      document.getElementById("score-val").textContent = score;
+      document.getElementById("best-val").textContent  = highScore;
+    }
 
-    while True:
-        clock.tick(FPS)
+    // ── Draw ─────────────────────────────────────────────────────────────────
+    function roundRect(x, y, w, h, r, fill) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+    function drawGrid() {
+      ctx.strokeStyle = C.gray10;
+      ctx.lineWidth   = 0.5;
+      for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * CELL, 0);
+        ctx.lineTo(x * CELL, ROWS * CELL);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * CELL);
+        ctx.lineTo(COLS * CELL, y * CELL);
+        ctx.stroke();
+      }
+    }
 
-            if event.type == pygame.KEYDOWN:
-                if game_state == "playing":
-                    if event.key == pygame.K_UP and direction != DOWN:
-                        pending_dir = UP
-                    elif event.key == pygame.K_DOWN and direction != UP:
-                        pending_dir = DOWN
-                    elif event.key == pygame.K_LEFT and direction != RIGHT:
-                        pending_dir = LEFT
-                    elif event.key == pygame.K_RIGHT and direction != LEFT:
-                        pending_dir = RIGHT
-                    elif event.key == pygame.K_ESCAPE:
-                        game_state = "start"
+    function drawSnake() {
+      snake.forEach((seg, i) => {
+        const px = seg.x * CELL;
+        const py = seg.y * CELL;
+        if (i === 0) {
+          // Head — white shell
+          roundRect(px + 1, py + 1, CELL - 2, CELL - 2, 5, C.white);
+          // Red inner dot
+          roundRect(px + 5, py + 5, CELL - 10, CELL - 10, 3, C.red);
+        } else {
+          roundRect(px + 1, py + 1, CELL - 2, CELL - 2, 5, C.gray7);
+        }
+      });
+    }
 
-                elif game_state in ("start", "dead"):
-                    if event.key == pygame.K_SPACE:
-                        snake, direction, food, score = new_game()
-                        pending_dir = direction
-                        game_state  = "playing"
+    function drawFood() {
+      const px = food.x * CELL;
+      const py = food.y * CELL;
+      // Red circle pellet
+      ctx.beginPath();
+      ctx.arc(px + CELL / 2, py + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2);
+      ctx.fillStyle = C.red;
+      ctx.fill();
+      // Shine
+      ctx.beginPath();
+      ctx.arc(px + 7, py + 7, 2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fill();
+    }
 
-        # ── Update ──────────────────────────────────────────────────────────
-        if game_state == "playing":
-            direction    = pending_dir
-            head_x, head_y = snake[0]
-            new_head     = (head_x + direction[0], head_y + direction[1])
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = C.black;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawFood();
+      drawSnake();
+    }
 
-            if (new_head in snake
-                    or not (0 <= new_head[0] < COLS)
-                    or not (0 <= new_head[1] < ROWS)):
-                high_score = max(high_score, score)
-                game_state = "dead"
-            else:
-                snake.insert(0, new_head)
-                if new_head == food:
-                    score += 10
-                    food   = spawn_food(snake)
-                else:
-                    snake.pop()
+    // ── Update ───────────────────────────────────────────────────────────────
+    function update() {
+      dir = nextDir;
+      const head    = snake[0];
+      const newHead = { x: head.x + dir.x, y: head.y + dir.y };
 
-        # ── Draw ────────────────────────────────────────────────────────────
-        screen.fill(BRAND_BLACK)
-        draw_grid(screen)
-        draw_snake(screen, snake)
-        draw_food(screen, food)
-        draw_hud(screen, score, high_score, font_small)
+      // Collision check
+      const hitWall = newHead.x < 0 || newHead.x >= COLS ||
+                      newHead.y < 0 || newHead.y >= ROWS;
+      const hitSelf = snake.some(s => s.x === newHead.x && s.y === newHead.y);
 
-        if game_state == "start":
-            draw_overlay(screen, font_large, font_small,
-                         ["Great Place To Work®", "Snake"],
-                         sub="Arrow Keys to move  •  SPACE to start")
-        elif game_state == "dead":
-            draw_overlay(screen, font_large, font_small,
-                         ["Game Over!", f"Score: {score}"],
-                         sub="SPACE to restart  •  ESC for menu")
+      if (hitWall || hitSelf) {
+        clearInterval(loop);
+        highScore = Math.max(highScore, score);
+        updateHUD();
+        showOverlay("Game Over", `Score: ${score}`, "PLAY AGAIN");
+        return;
+      }
 
-        pygame.display.flip()
+      snake.unshift(newHead);
 
+      if (newHead.x === food.x && newHead.y === food.y) {
+        score += 10;
+        food = spawnFood();
+        updateHUD();
+      } else {
+        snake.pop();
+      }
 
-if __name__ == "__main__":
-    main()
+      draw();
+    }
+
+    // ── Overlay ──────────────────────────────────────────────────────────────
+    function showOverlay(title, subtitle, btnLabel) {
+      const ov  = document.getElementById("overlay");
+      ov.innerHTML = `
+        <h1>${title}</h1>
+        <div class="divider"></div>
+        <h2>${subtitle}</h2>
+        <p>Use Arrow Keys to move</p>
+        <button id="overlay-btn">${btnLabel}</button>
+      `;
+      ov.style.display = "flex";
+      document.getElementById("overlay-btn")
+               .addEventListener("click", startGame);
+    }
+
+    // ── Start ────────────────────────────────────────────────────────────────
+    function startGame() {
+      document.getElementById("overlay").style.display = "none";
+      newGame();
+      draw();
+      loop = setInterval(update, 1000 / FPS);
+    }
+
+    // ── Controls ─────────────────────────────────────────────────────────────
+    document.addEventListener("keydown", e => {
+      switch (e.key) {
+        case "ArrowUp":
+          if (dir !== DIR.DOWN)  nextDir = DIR.UP;    break;
+        case "ArrowDown":
+          if (dir !== DIR.UP)    nextDir = DIR.DOWN;  break;
+        case "ArrowLeft":
+          if (dir !== DIR.RIGHT) nextDir = DIR.LEFT;  break;
+        case "ArrowRight":
+          if (dir !== DIR.LEFT)  nextDir = DIR.RIGHT; break;
+      }
+      e.preventDefault();
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.getElementById("overlay-btn")
+            .addEventListener("click", startGame);
+  </script>
+</body>
+</html>
